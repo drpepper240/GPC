@@ -1036,11 +1036,12 @@ function DrawWidgetLaserCam(guiDataId)
 	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
+	widgetText = tostring(T_ctrlTempData[controllerId].hitX)..";"..tostring(T_ctrlTempData[controllerId].hitY)..";"..tostring(T_ctrlTempData[controllerId].hitZ)..";"
+
 	if guiMode == "MODE_VERSION" then
 		widgetText = tostring(T_ctrlTempData[controllerId].version)
 	end
-	
-	widgetText = tostring(T_ctrlTempData[controllerId].hitX)..";"..tostring(T_ctrlTempData[controllerId].hitY)..";"..tostring(T_ctrlTempData[controllerId].hitZ)..";"
+
 	for i = xPosition, xPosition + widget.draw.len do
 		local letterPos = i + 1 - xPosition
 		if letterPos <= string.len(widgetText) then
