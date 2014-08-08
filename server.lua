@@ -935,10 +935,15 @@ function DrawWidgetLaserEm(guiDataId)
 		return
 	end
 	
+	if T_ctrlTempData[controllerId] == nil then
+		PrintDbg("PrepareLaser() T_ctrlTempData missing", 1)
+		T_ctrlTempData[controllerId] = {}
+		T_ctrlTempData[controllerId].state = colors.orange
+		T_ctrlTempData[controllerId].lastResp = 0 
+	end
+	
 	if guiMode == "MODE_VERSION" then
 		widgetText = tostring(T_ctrlTempData[controllerId].version)
-	elseif guiMode == "MODE_GFOR" then
-		widgetText = tostring(gx)..";"..tostring(gy)..";"..tostring(gz)..";"
 	end
 	
 	--target from the table
