@@ -12,7 +12,7 @@
 --ID shoud be 3 chars or longer
 --ID should not be equal to controller type
 
-VERSION_STRING = "0.75"
+VERSION_STRING = "0.76"
 
 --				SUPPORTED TYPES:
 T_perTypes = {[1] = "AIRLOCK", [2] = "P_LEM", [3] = "CONTROLLER", [4] = "P_LEC"}
@@ -107,6 +107,7 @@ function GetSideFromUser(peripheralName)
 	for i=1, #T_sides do
 		write(tostring(i).." - "..tostring(T_sides[i]).."\n")
 	end
+	print("a - autodetect")
 	input = read()
 	if tostring(input) == "a" and peripheralName ~= nil then
 		--autodetect
@@ -388,6 +389,8 @@ label = os.getComputerLabel()
 if (label == 0) then
 	PrintDbg("Assign this controller a unique label", 0)
 	return
+else
+	print("ID: "..tostring(label))
 end
 
 ReadResume()
