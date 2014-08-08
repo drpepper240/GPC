@@ -14,10 +14,8 @@ if not http then
 end
  
 local function Download(filepath)
-    write( "Connecting to github.com... " )
-    local response = http.get(
-        "https://raw.githubusercontent.com/"..textutils.urlEncode( filename )
-    )
+    write( "Connecting... " )
+    local response = http.get( filepath )
         
     if response then
         print( "Success." )
@@ -39,13 +37,13 @@ local function Get(gitPath, localName)
     end
     
     -- GET the contents from github
-    local res = get(gitPath)
+    local res = Download(gitPath)
     if res then        
         local file = fs.open( sPath, "w" )
         file.write( res )
         file.close()
         
-        print( "Downloaded as "..sFile )
+        print( "Downloaded as "..localName )
     end
 end
 
@@ -53,13 +51,14 @@ end
 --deleting
 --shell.run("rm", "startup")
 --shell.run("rm", "sdata")
+--shell.run("rm", "data")
 
 --server
---get("drpepper240/GPC/master/server.lua", "startup")
+--Get("https://raw.githubusercontent.com/drpepper240/GPC/master/server.lua", "startup")
 --server sdata
---shell.run("pastebin", "get", "", "startup")
+--shell.run("pastebin", "get", "", "sdata")
 
 --client
---get("drpepper240/GPC/master/client.lua", "startup")
+--Get("https://raw.githubusercontent.com/drpepper240/GPC/master/client.lua", "startup")
 
-
+--os.reboot()
