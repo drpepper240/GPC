@@ -213,20 +213,20 @@ function GuiLoop()
 			ProcessClick(p2,p3)
 		elseif event == "key" then
 			if p1 == 22 then
-				print("press 1 to update only sdata, 2 to update everything")
-				sleep(0.3)
-				local event, p1, p2, p3, p4, p5  = os.pullEvent("key")
-				if p1 == 2 then
+--				print("press 1 to update only sdata, 2 to update everything")
+--				sleep(0.3)
+--				local event, p1, p2, p3, p4, p5  = os.pullEvent("key")
+--				if p1 == 2 then
 					shell.run("rm", "sdata")
 					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
 					os.reboot()
-				elseif p1 == 3 then
-					shell.run("rm", "sdata")
-					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
-					shell.run("rm", "startup")
-					shell.run("pastebin", "get "..sdata.settings.pastebin.." startup")
-					os.reboot()
-				end
+--				elseif p1 == 3 then
+--					shell.run("rm", "sdata")
+--					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
+--					shell.run("rm", "startup")
+--					shell.run("pastebin", "get "..sdata.settings.pastebin.." startup")
+--					os.reboot()
+--				end
 			end
 		end
 		
@@ -487,6 +487,153 @@ function ProcessPeripheralReturnMessage(packetT)
 	PrintDbg("p4: "..tostring(packetT.p4), 2)
 	PrintDbg("p5: "..tostring(packetT.p5), 2)
 	PrintDbg("p6: "..tostring(packetT.p6), 2)
+end
+
+
+---------------------------------------------------------------------------------------------------
+-------------------			LASER UTILS
+---------------------------------------------------------------------------------------------------
+
+--stores temporary laser data like packets to send when "FIRE" button is pressed
+T_laserTempData = nil
+
+--params: laser controller id and target coordinates (absolute)
+--returns: boolean canFire, numeric r, t, p (or false, nil, nil, nil)
+function PrepareLaser(controllerId, gtx, gty, gtz)
+----
+	if T_ctrlTempData[controllerId] == nil then
+		PrintDbg("PrepareLaser() T_ctrlTempData missing", 1)
+		T_ctrlTempData[controllerId] = {}
+		T_ctrlTempData[controllerId].state = colors.orange
+		T_ctrlTempData[controllerId].lastResp = 0 
+		return false, nil, nil, nil
+	end
+	
+	if T_ctrlTempData[controllerId].pos == nil then
+		PrintDbg("PrepareLaser() 'pos' result missing", 1)
+		T_ctrlTempData[controllerId].pos = {}
+		SendPosRequest(controllerId)
+		return false, nil, nil, nil
+	end
+	
+	local bgColor = GetWidgetStateColor(guiDataId)
+	monitor.setBackgroundColor(bgColor)
+	
+	--emitter coordinates
+	if T_ctrlTempData[controllerId].pos[1] == nil or T_ctrlTempData[controllerId].pos[2] == nil or T_ctrlTempData[controllerId].pos[3] == nil then
+		PrintDbg("PrepareLaser() 'pos' result is nil", 1)
+		SendPosRequest(controllerId)
+		return false, nil, nil, nil
+	end
+	
+	local gx = tonumber(T_ctrlTempData[controllerId].pos[1])
+	local gy = tonumber(T_ctrlTempData[controllerId].pos[2])
+	local gz = tonumber(T_ctrlTempData[controllerId].pos[3])
+	
+	--target vector
+	local tx, ty, tz = nil, nil, nil
+	local selected = T_guiTempData[widget.tTGuiId].selected
+	if gtx ~= nil and gty ~= nil and gtz ~= nil then
+		tx = tonumber(gtx) - gx
+		ty = tonumber(gty) - gy
+		tz = tonumber(gtz) - gz
+	end
+	
+	local r, t, p = CartesianToPolar(tx, ty, tz)
+
+	local canFire = false
+
+	if r ~= nil or t~=nil or p ~= nil then
+		t = math.deg(t)
+		p = math.deg(p)
+		PrintDbg(tostring(r)..";"..tostring(t)..";"..tostring(p), 1)
+		
+		local allowed = sdata.ctrlData[controllerId].allowed
+		--allowed = { { { t, t }, {p, p} }, { { t, t }, {p, p} } }
+		
+		for i=1, table.getn(allowed) do
+			if t >= allowed[i][1][1] and t<= allowed[i][1][2] then
+				PrintDbg(tostring(t).." between "..tostring(allowed[i][1][1])..";"..tostring(allowed[i][1][2]), 2)
+				if t == 0 or t == 180 then	--gimbal lock workaround
+					canFire = true
+				else
+					if p >= allowed[i][2][1] and p<= allowed[i][2][2] then
+						PrintDbg(tostring(t).." between "..tostring(allowed[i][2][1])..";"..tostring(allowed[i][2][2]), 2)
+						canFire = true
+					end
+				end
+			end
+		end
+		
+		widgetText = string.format("%d;%d;%d", math.floor(r), math.floor(t), math.floor(p))		
+
+		if canFire and T_ctrlTempData[controllerId].state == colors.green then
+			if T_laserTempData == nil then
+				T_laserTempData = {}
+			end
+			
+			--create a packet to send when FIRE button is pressed
+			local packetT = 
+			{
+				target = controllerId,
+				command = "PEXECUTE",
+				pCommand = "emitBeam",
+				p1 = tx,
+				p2 = ty,
+				p3 = tz,
+				delay = sdata.settings.laserDelay
+			}
+			
+			--packets for secondary lasers
+			local secondary = sdata.ctrlData[controllerId].secondary
+			for i=1, table.getn(secondary) do
+				--emitter coordinates
+				skipEmitter = false
+
+				if T_ctrlTempData[secondary[i]] == nil then
+					T_ctrlTempData[secondary[i]] = {}
+					SendPosRequest(controllerId)
+					skipEmitter = true
+				end
+
+				if T_ctrlTempData[secondary[i]].pos == nil then
+					PrintDbg("PrepareLaser() 'pos' result missing for "..tostring(secondary[i]), 1)
+					T_ctrlTempData[secondary[i]].pos = {}
+					SendPosRequest(secondary[i])
+					skipEmitter = true
+				end
+				if T_ctrlTempData[secondary[i]].pos[1] == nil or T_ctrlTempData[secondary[i]].pos[2] == nil or T_ctrlTempData[secondary[i]].pos[3] == nil then
+					PrintDbg("PrepareLaser() 'pos' result is nil for "..tostring(secondary[i]), 1)
+					SendPosRequest(secondary[i])
+					skipEmitter = true
+				end
+				if skipEmitter == false then
+					sgx = tonumber(T_ctrlTempData[secondary[i]].pos[1])
+					sgy = tonumber(T_ctrlTempData[secondary[i]].pos[2])
+					sgz = tonumber(T_ctrlTempData[secondary[i]].pos[3])
+
+					local sPacketT = 
+					{
+						target = secondary[i],
+						command = "PEXECUTE",
+						pCommand = "emitBeam",
+						p1 = gx - sgx,
+						p2 = gy - sgy,
+						p3 = gz - sgz,
+					}
+					T_laserTempData[secondary[i]] = textutils.serialize(sPacketT)
+				end
+			end
+			
+			T_laserTempData[controllerId] = textutils.serialize(packetT)
+		else
+			T_laserTempData[controllerId] = nil
+		end
+	else
+		T_laserTempData[controllerId] = nil
+	end
+	
+	return canFire, r, t, p
 end
 
 
@@ -784,152 +931,38 @@ function DrawWidgetLaserEm(guiDataId)
 	
 	local controllerId = widget.controllerIds[1]
 	if controllerId == nil then
-		PrintDbg("DrawWidgetLaserEm() sensorId missing", 1)
+		PrintDbg("DrawWidgetLaserEm() controllerId missing", 1)
 		return
 	end
 	
-	if T_ctrlTempData[controllerId] == nil then
-		PrintDbg("DrawWidgetLaserEm() T_ctrlTempData missing", 1)
-		T_ctrlTempData[controllerId] = {}
-		T_ctrlTempData[controllerId].state = colors.orange
-		T_ctrlTempData[controllerId].lastResp = 0 
-		return
-	end
-	
-	if T_ctrlTempData[controllerId].pos == nil then
-		PrintDbg("DrawWidgetLaserEm() 'pos' result missing", 1)
-		T_ctrlTempData[controllerId].pos = {}
-		SendPosRequest(controllerId)
-		return
-	end
-	
-	local bgColor = GetWidgetStateColor(guiDataId)
-	monitor.setBackgroundColor(bgColor)
-	
-	--emitter coordinates
-	if T_ctrlTempData[controllerId].pos[1] == nil or T_ctrlTempData[controllerId].pos[2] == nil or T_ctrlTempData[controllerId].pos[3] == nil then
-		PrintDbg("DrawWidgetLaserEm() 'pos' result is nil", 1)
-		SendPosRequest(controllerId)
-		return
-	end
-	
-	gx = tonumber(T_ctrlTempData[controllerId].pos[1])
-	gy = tonumber(T_ctrlTempData[controllerId].pos[2])
-	gz = tonumber(T_ctrlTempData[controllerId].pos[3])
-
 	if guiMode == "MODE_VERSION" then
 		widgetText = tostring(T_ctrlTempData[controllerId].version)
 	elseif guiMode == "MODE_GFOR" then
 		widgetText = tostring(gx)..";"..tostring(gy)..";"..tostring(gz)..";"
 	end
 	
-	--target vector
+	--target from the table
 	local tx, ty, tz = nil, nil, nil
 	local selected = T_guiTempData[widget.tTGuiId].selected
 	if selected ~= nil and T_guiTempData[widget.tTGuiId].targetList~= nil and T_guiTempData[widget.tTGuiId].targetList[selected]~= nil then
-		tx = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].x) - gx
-		ty = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].y) - gy
-		tz = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].z) - gz
+		tx = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].x)
+		ty = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].y)
+		tz = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].z)
 	end
+	local canFire, r, t, p = PrepareLaser(controllerId, tx, ty, tz)
+
+	if canFire then
+		widgetText = string.format("  %d;%d;%d", math.floor(r), math.floor(t), math.floor(p))
+	end		
 	
-	local r, t, p = CartesianToPolar(tx, ty, tz)
-
-	local canFire = false
-
-	if T_guiTempData[widget.eBGuId] == nil then 
-		T_guiTempData[widget.eBGuId] = {}
-	end
-	
-	if r ~= nil or t~=nil or p ~= nil then
-		t = math.deg(t)
-		p = math.deg(p)
-		PrintDbg(tostring(r)..";"..tostring(t)..";"..tostring(p), 1)
-		
-		local allowed = sdata.ctrlData[controllerId].allowed
-		--allowed = { { { t, t }, {p, p} }, { { t, t }, {p, p} } }
-		
-		for i=1, table.getn(allowed) do
-			if t >= allowed[i][1][1] and t<= allowed[i][1][2] then
-				PrintDbg(tostring(t).." between "..tostring(allowed[i][1][1])..";"..tostring(allowed[i][1][2]), 2)
-				if t == 0 or t == 180 then	--gimbal lock workaround
-					canFire = true
-				else
-					if p >= allowed[i][2][1] and p<= allowed[i][2][2] then
-						PrintDbg(tostring(t).." between "..tostring(allowed[i][2][1])..";"..tostring(allowed[i][2][2]), 2)
-						canFire = true
-					end
-				end
-			end
-		end
-		
-		widgetText = string.format("%d;%d;%d", math.floor(r), math.floor(t), math.floor(p))		
-
-		if canFire and T_ctrlTempData[controllerId].state == colors.green then
-			--create a packet to send when FIRE button is pressed
-			local packetT = 
-			{
-				target = controllerId,
-				command = "PEXECUTE",
-				pCommand = "emitBeam",
-				p1 = tx,
-				p2 = ty,
-				p3 = - tz, --AZAZA CROS CANNOT INTO TRANSFORMATIONS WORKAROUND
-				delay = sdata.settings.laserDelay
-			}
-			
-			--packets for secondary lasers
-			local secondary = sdata.ctrlData[controllerId].secondary
-			for i=1, table.getn(secondary) do
-				--emitter coordinates
-				skipEmitter = false
-
-				if T_ctrlTempData[secondary[i]] == nil then
-					T_ctrlTempData[secondary[i]] = {}
-					SendPosRequest(controllerId)
-					skipEmitter = true
-				end
-
-				if T_ctrlTempData[secondary[i]].pos == nil then
-					PrintDbg("DrawWidgetLaserEm() 'pos' result missing for "..tostring(secondary[i]), 1)
-					T_ctrlTempData[secondary[i]].pos = {}
-					SendPosRequest(secondary[i])
-					skipEmitter = true
-				end
-				if T_ctrlTempData[secondary[i]].pos[1] == nil or T_ctrlTempData[secondary[i]].pos[2] == nil or T_ctrlTempData[secondary[i]].pos[3] == nil then
-					PrintDbg("DrawWidgetLaserEm() 'pos' result is nil for "..tostring(secondary[i]), 1)
-					SendPosRequest(secondary[i])
-					skipEmitter = true
-				end
-				if skipEmitter == false then
-					sgx = tonumber(T_ctrlTempData[secondary[i]].pos[1])
-					sgy = tonumber(T_ctrlTempData[secondary[i]].pos[2])
-					sgz = tonumber(T_ctrlTempData[secondary[i]].pos[3])
-
-					local sPacketT = 
-					{
-						target = secondary[i],
-						command = "PEXECUTE",
-						pCommand = "emitBeam",
-						p1 = gx - sgx,
-						p2 = gy - sgy,
-						p3 = - gz + sgz, --AZAZA CROS CANNOT INTO TRANSFORMATIONS WORKAROUND
-					}
-					T_guiTempData[widget.eBGuId][secondary[i]] = textutils.serialize(sPacketT)
-				end
-			end
-			
-			T_guiTempData[widget.eBGuId][controllerId] = textutils.serialize(packetT)
-		else
-			T_guiTempData[widget.eBGuId][controllerId] = nil
-		end
-	else
-		T_guiTempData[widget.eBGuId][controllerId] = nil
-	end
-		
-	
+	--first (blank) symbol is laser state
+	--second (blank) symbol is ability to fire
 	for i = xPosition, xPosition + widget.draw.len do
 		local letterPos = i + 1 - xPosition
-		if letterPos > 3 then
+		if letterPos == 1 then
+			monitor.setBackgroundColor(T_ctrlTempData[controllerId].state)
+		end
+		if letterPos == 2 then
 			if canFire then
 				monitor.setBackgroundColor(colors.green)
 			else
@@ -965,7 +998,7 @@ function DrawWidgetLaserCam(guiDataId)
 	
 	local controllerId = widget.controllerIds[1]
 	if controllerId == nil then
-		PrintDbg("DrawWidgetLaserCam() sensorId missing", 1)
+		PrintDbg("DrawWidgetLaserCam() controllerId missing", 1)
 		return
 	end
 	
@@ -1346,7 +1379,6 @@ function ClickWidgetLaserEm(guiDataId)
 		return
 	end
 	
-	--TODO toggle state
 	local packetT = 
 	{
 		target = controller_id
@@ -1495,14 +1527,14 @@ end
 
 function ClickWidgetEngageButton(guiDataId)
 	if T_guiTempData[guiDataId] ~= nil and modem ~= nil then
-		for key,value in pairs( T_guiTempData[guiDataId] ) do
+		for key,value in pairs( T_laserTempData ) do
 			PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 2)
 			modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
 		end
-		T_guiTempData[guiDataId] = nil
+		T_laserTempData = nil
 		os.queueEvent("redraw")
-	elseif T_guiTempData[guiDataId] == nil then
-		PrintDbg("ClickWidgetEngageButton(): guiDataId is null", 0)
+	elseif T_laserTempData == nil then
+		PrintDbg("ClickWidgetEngageButton(): T_laserTempData is null", 0)
 	end
 	PrintDbg("ClickWidgetEngageButton(): done", 0)
 end
