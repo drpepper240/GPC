@@ -534,7 +534,7 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 	
 	--target vector
 	local tx, ty, tz = nil, nil, nil
-	local selected = T_guiTempData[widget.tTGuiId].selected
+
 	if gtx ~= nil and gty ~= nil and gtz ~= nil then
 		tx = tonumber(gtx) - gx
 		ty = tonumber(gty) - gy
