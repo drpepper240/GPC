@@ -7,7 +7,7 @@
 -- and you think this stuff is worth it, you can give me a beer in return
 
 --don't forget to update this string
-VERSION_STRING = "0.78"
+VERSION_STRING = "0.79"
 
 ---------------------------------------------------------------------------------------------------
 -------------------			README
@@ -214,20 +214,22 @@ function GuiLoop()
 			ProcessClick(p2,p3)
 		elseif event == "key" then
 			if p1 == 22 then
---				print("press 1 to update only sdata, 2 to update everything")
---				sleep(0.3)
---				local event, p1, p2, p3, p4, p5  = os.pullEvent("key")
---				if p1 == 2 then
+				print("press 1 to update only sdata, 2 to update everything")
+				sleep(0.3)
+				local event, p1, p2, p3, p4, p5  = os.pullEvent("key")
+				if p1 == 2 then
 					shell.run("rm", "sdata")
-					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
-					os.reboot()
---				elseif p1 == 3 then
---					shell.run("rm", "sdata")
 --					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
---					shell.run("rm", "startup")
---					shell.run("pastebin", "get "..sdata.settings.pastebin.." startup")
---					os.reboot()
---				end
+					Get(sdata.settings.sdataUrl)
+					os.reboot()
+				elseif p1 == 3 then
+					shell.run("rm", "sdata")
+					Get(sdata.settings.sdataUrl)
+					shell.run("rm", "startup")
+					Get(sdata.settings.startupUrl)
+					shell.run("pastebin", "get "..sdata.settings.pastebin.." startup")
+					os.reboot()
+				end
 			end
 		end
 		
@@ -396,6 +398,43 @@ function CartesianToPolar(x, y, z)
 	local phi = math.atan2(x, z)
 	return r, theta, phi
 end
+
+
+function Download(url)
+    write( "Connecting... " )
+    local response = http.get( url )
+        
+    if response then
+        print( "Success." )
+        
+        local sResponse = response.readAll()
+        response.close()
+        return sResponse
+    else
+        printError( "Failed." )
+    end
+end
+
+
+local function Get(url, fileName)
+    -- Determine file to download
+    local sPath = shell.resolve( fileName )
+    if fs.exists( sPath ) then
+        print( "File already exists" )
+        return
+    end
+    
+    -- GET the contents from github
+    local res = Download(url)
+    if res then        
+        local file = fs.open( sPath, "w" )
+        file.write( res )
+        file.close()
+        
+        print( "Downloaded as "..fileName )
+    end
+end
+
 
 ---------------------------------------------------------------------------------------------------
 -------------------			NETWORK HI-LEVEL
