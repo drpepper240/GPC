@@ -7,7 +7,7 @@
 -- and you think this stuff is worth it, you can give me a beer in return
 
 --don't forget to update this string
-VERSION_STRING = "0.76"
+VERSION_STRING = "0.77"
 
 ---------------------------------------------------------------------------------------------------
 -------------------			README
@@ -110,6 +110,7 @@ VERSION_STRING = "0.76"
 --MODE_OVERRIDE			--click on a widget sends an "override" message to all associated controllers instead of passing the click to processing function
 --MODE_GFOR				--show coordinates in global frame of reference where possible
 --MODE_LFOR				--show coordinates in local (ship-bound) frame of reference where possible
+--MODE_AUTOFIRE			--fire lasers when GetFirstHit message received
 
 
 -------------------			DEBUG LEVELS
@@ -1051,6 +1052,28 @@ function DrawWidgetLaserCam(guiDataId)
 		end
 		T_guiXy[i][yPosition] = guiDataId
 	end
+	
+	if guiMode == "MODE_AUTOFIRE" then
+		if 	T_ctrlTempData[controllerId].hitX ~= nil and T_ctrlTempData[controllerId].hitY ~= nil and T_ctrlTempData[controllerId].hitZ ~= nil then
+			for i=1, table.getn(widget.autofireCtrlIds) do
+				laserControllerId = widget.autofireCtrlIds[i]
+				PrepareLaser(laserControllerId, T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ)
+			end
+			
+			--fire
+			for key,value in pairs( T_laserTempData ) do
+				PrintDbg("AUTOFIRE: sending to "..tostring(key), 1)
+				if value ~= nil then
+					modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
+				end
+				T_laserTempData[key] = nil
+			end
+			
+			--clearing results
+			T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ = nil, nil, nil
+			
+		end
+	end
 end
 
 
@@ -1547,8 +1570,11 @@ end
 
 function ClickWidgetEngageButton(guiDataId)
 	for key,value in pairs( T_laserTempData ) do
-			PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 1)
+		PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 1)
+		if value ~= nil then
 			modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
+		end
+		T_laserTempData[key] = nil
 	end
 	os.queueEvent("redraw")
 	PrintDbg("ClickWidgetEngageButton(): done", 0)
