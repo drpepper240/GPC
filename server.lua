@@ -951,13 +951,13 @@ function DrawWidgetLaserEm(guiDataId)
 	local selected = nil
 	if T_guiTempData[widget.tTGuiId] ~= nil then
 		selected = T_guiTempData[widget.tTGuiId]
-	end
-	
-	--TODO remove debug
-	if T_guiTempData[widget.tTGuiId].targetList == nil then
-		PrintDbg("DrawWidgetLaserEm(): TT targetList missing", 1)
-	elseif T_guiTempData[widget.tTGuiId].targetList[selected] == nil then
-		PrintDbg("DrawWidgetLaserEm(): TT selection missing", 1)
+		
+		--TODO remove debug
+		if T_guiTempData[widget.tTGuiId].targetList == nil then
+			PrintDbg("DrawWidgetLaserEm(): TT targetList missing", 1)
+		elseif T_guiTempData[widget.tTGuiId].targetList[selected] == nil then
+			PrintDbg("DrawWidgetLaserEm(): TT selection missing", 1)
+		end
 	end
 	
 
