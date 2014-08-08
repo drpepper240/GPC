@@ -256,12 +256,14 @@ function ReceiveLoop()
 	end
 end
 
---returns widget state color (orange is for missing widgets)
-function GetWidgetStateColor(guiDataId)
+--returns controller state color (orange is for missing widgets)
+function GetControllerStateColor(controllerId)
+	if controllerId == nil then
+		PrintDbg("GetControllerStateColor(): controllerId missing", 1)
+		return colors.orange
+	end
 	local curTime = os.time()
 	local missing = false
-	local widget = sdata.guiData[guiDataId]
-	local controllerId = widget.controllerIds[1]
 	
 	if T_ctrlTempData[controllerId] == nil then
 		T_ctrlTempData[controllerId] = {}
@@ -516,7 +518,7 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 		return false, nil, nil, nil
 	end
 	
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
 	--emitter coordinates
@@ -711,7 +713,7 @@ function DrawWidgetSwitch(guiDataId)
 		return
 	end
 
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 		
 	local maxX = mSizeX
@@ -796,7 +798,7 @@ function DrawWidgetSensor(guiDataId)
 		return
 	end
 
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
 	local maxX = mSizeX
@@ -847,13 +849,13 @@ function DrawWidgetSensorBar(guiDataId)
 	monitor.setTextColor(sdata.settings.guiTextColor)
 	
 	for index=1, #bar.controllerIds do
-		local sensorId = bar.controllerIds[index]
-		if sensorId == nil then
+		local controllerId = bar.controllerIds[index]
+		if controllerId == nil then
 			PrintDbg("DrawWidgetSensorBar() sensorId missing", 2)
 			return
 		end
 
-		local bgColor = GetWidgetStateColor(guiDataId)
+		local bgColor = GetControllerStateColor(controllerId)
 		monitor.setBackgroundColor(bgColor)
 	
 		local len = 1
@@ -1030,7 +1032,7 @@ function DrawWidgetLaserCam(guiDataId)
 		return
 	end
 	
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
 	if guiMode == "MODE_VERSION" then
@@ -1174,7 +1176,7 @@ function DrawWidgetReferencePoint(guiDataId)
 		return
 	end
 
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
 	if T_ctrlTempData[controllerId].pos == nil then
