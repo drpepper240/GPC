@@ -12,7 +12,7 @@
 --ID shoud be 3 chars or longer
 --ID should not be equal to controller type
 
-VERSION_STRING = "0.76"
+VERSION_STRING = "0.77"
 
 --				SUPPORTED TYPES:
 T_perTypes = {[1] = "AIRLOCK", [2] = "P_LEM", [3] = "CONTROLLER", [4] = "P_LEC"}
@@ -36,7 +36,7 @@ T_data.channelReceive = 211
 T_data.pastebin = "7unFnvQV"				--pastebin entry for self-update
 T_data.state = colors.green					--default state (states are depicted by colors)
 T_data.overridden = false					--override mode
-T_data.debugLvl = 1							--debug level
+T_data.debugLvl = 2							--debug level
 T_data.perSide = nil						--peripheral side
 T_data.controllerType = nil					--controller type
 T_data.rsis = nil							--RS input side
