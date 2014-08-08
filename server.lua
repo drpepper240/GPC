@@ -528,6 +528,13 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 		return false, nil, nil, nil
 	end
 	
+	if T_laserTempData == nil then
+		T_laserTempData = {}
+		if T_laserTempData[controllerId] == nil then
+			T_laserTempData[controllerId] = {}
+		end
+	end
+	
 	local gx = tonumber(T_ctrlTempData[controllerId].pos[1])
 	local gy = tonumber(T_ctrlTempData[controllerId].pos[2])
 	local gz = tonumber(T_ctrlTempData[controllerId].pos[3])
@@ -570,9 +577,6 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 		widgetText = string.format("%d;%d;%d", math.floor(r), math.floor(t), math.floor(p))		
 
 		if canFire and T_ctrlTempData[controllerId].state == colors.green then
-			if T_laserTempData == nil then
-				T_laserTempData = {}
-			end
 			
 			--create a packet to send when FIRE button is pressed
 			local packetT = 
