@@ -950,7 +950,7 @@ function DrawWidgetLaserEm(guiDataId)
 	local tx, ty, tz = nil, nil, nil
 	local selected = nil
 	if T_guiTempData[widget.tTGuiId] ~= nil then
-		selected = T_guiTempData[widget.tTGuiId]
+		selected = T_guiTempData[widget.tTGuiId].selected --selected row
 		
 		--TODO remove debug
 		if T_guiTempData[widget.tTGuiId].targetList == nil then
