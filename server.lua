@@ -987,7 +987,7 @@ function DrawWidgetLaserEm(guiDataId)
 				monitor.setBackgroundColor(colors.red)
 			end
 		else 
-			monitor.setBackgroundColor = sdata.settings.guiBgColor
+			monitor.setBackgroundColor(sdata.settings.guiBgColor)
 		end
 		if letterPos <= string.len(widgetText) then
 			monitor.write(string.sub(widgetText, letterPos, letterPos))
@@ -1252,7 +1252,7 @@ function DrawWidgetEngageButton(guiDataId)
 	end
 	monitor.setCursorPos(xPosition, widget.draw.yPos)
 	monitor.setTextColor(sdata.settings.guiBgColor)
-	monitor.setBackgroundColor(colors.red)
+	monitor.setBackgroundColor(colors.redu)
 	
 	for i = xPosition, xPosition + widget.draw.len do
 		local letterPos = i + 1 - xPosition
