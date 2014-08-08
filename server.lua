@@ -951,7 +951,8 @@ function DrawWidgetLaserEm(guiDataId)
 	local selected = nil
 	if T_guiTempData[widget.tTGuiId] ~= nil then
 		selected = T_guiTempData[widget.tTGuiId]
-	end
+	else
+		PrintDbg("DrawWidgetLaserEm(): TT tempdata missing",1)
 	
 	local canFire, r, t, p = false, nil, nil, nil 
 	
