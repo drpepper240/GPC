@@ -196,6 +196,8 @@ function Init()
 	monitor.setTextScale(sdata.settings.textSize)
 	mSizeX, mSizeY = monitor.getSize()
 	PrintDbg("Monitor size:"..tostring(mSizeX)..", "..tostring(mSizeY), 1)
+	print("GPC server by drPepper")
+	print("version "..VERSION_STRING)
 	monitor.write("GPC server by drPepper")
 	monitor.write("version "..VERSION_STRING)
 	
@@ -1544,16 +1546,11 @@ function ClickWidgetReferencePoint(guiDataId)
 end
 
 function ClickWidgetEngageButton(guiDataId)
-	if T_guiTempData[guiDataId] ~= nil and modem ~= nil then
-		for key,value in pairs( T_laserTempData ) do
+	for key,value in pairs( T_laserTempData ) do
 			PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 2)
 			modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
-		end
-		T_laserTempData = nil
-		os.queueEvent("redraw")
-	elseif T_laserTempData == nil then
-		PrintDbg("ClickWidgetEngageButton(): T_laserTempData is null", 0)
 	end
+	os.queueEvent("redraw")
 	PrintDbg("ClickWidgetEngageButton(): done", 0)
 end
 
