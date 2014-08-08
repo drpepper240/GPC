@@ -957,13 +957,6 @@ function DrawWidgetLaserEm(guiDataId)
 	local selected = nil
 	if T_guiTempData[widget.tTGuiId] ~= nil then
 		selected = T_guiTempData[widget.tTGuiId].selected --selected row
-		
-		--TODO remove debug
-		if T_guiTempData[widget.tTGuiId].targetList == nil then
-			PrintDbg("DrawWidgetLaserEm(): TT targetList missing", 1)
-		elseif T_guiTempData[widget.tTGuiId].targetList[selected] == nil then
-			PrintDbg("DrawWidgetLaserEm(): TT selection missing", 1)
-		end
 	end
 	
 
@@ -977,7 +970,7 @@ function DrawWidgetLaserEm(guiDataId)
 		canFire, r, t, p = PrepareLaser(controllerId, tx, ty, tz)
 	end
 
-	if canFire then
+	if r ~= nil and t ~= nil and p ~= nil then
 		widgetText = string.format("  %d;%d;%d", math.floor(r), math.floor(t), math.floor(p))
 	end		
 	
@@ -987,13 +980,14 @@ function DrawWidgetLaserEm(guiDataId)
 		local letterPos = i + 1 - xPosition
 		if letterPos == 1 then
 			monitor.setBackgroundColor(T_ctrlTempData[controllerId].state)
-		end
-		if letterPos == 2 then
+		elseif letterPos == 2 then
 			if canFire then
 				monitor.setBackgroundColor(colors.green)
 			else
 				monitor.setBackgroundColor(colors.red)
 			end
+		else 
+			monitor.setBackgroundColor = sdata.settings.guiBgColor
 		end
 		if letterPos <= string.len(widgetText) then
 			monitor.write(string.sub(widgetText, letterPos, letterPos))
