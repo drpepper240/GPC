@@ -1252,7 +1252,7 @@ function DrawWidgetEngageButton(guiDataId)
 	end
 	monitor.setCursorPos(xPosition, widget.draw.yPos)
 	monitor.setTextColor(sdata.settings.guiBgColor)
-	monitor.setBackgroundColor(colors.redu)
+	monitor.setBackgroundColor(colors.red)
 	
 	for i = xPosition, xPosition + widget.draw.len do
 		local letterPos = i + 1 - xPosition
