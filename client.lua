@@ -12,7 +12,7 @@
 --ID shoud be 3 chars or longer
 --ID should not be equal to controller type
 
-VERSION_STRING = "0.79"
+VERSION_STRING = "0.791"
 
 --				SUPPORTED TYPES:
 T_perTypes = {[1] = "AIRLOCK", [2] = "P_LEM", [3] = "CONTROLLER", [4] = "P_LEC"}
@@ -144,11 +144,13 @@ function GetSideFromUser(peripheralName)
 	for i=1, #T_sides do
 		write(tostring(i).." "..tostring(T_sides[i]).."\n")
 	end
-	print("a - autodetect")
-	input = read()
-	if tostring(input) == "a" and peripheralName ~= nil then
-		--autodetect
-		input = DetectPeripheral(peripheralName)
+	if peripheralName ~= nil then
+		print("a - autodetect "..peripheralName)
+		input = read()
+		if tostring(input) == "a" then
+			--autodetect
+			input = DetectPeripheral(peripheralName)
+		end
 	end
 	if tonumber(input) == nil then
 		return nil
@@ -161,7 +163,8 @@ end
 function DetectPeripheral(name)  
 	for i = 1, 6 do
 		if peripheral.isPresent(T_sides[i]) and peripheral.getType(T_sides[i]) == name then
-			print("found "..tostring(name)..": "..tostring(T_sides[i]))
+			print("Found "..tostring(name)..": "..tostring(T_sides[i]))
+			print()
 			return i
 		else
 			PrintDbg("not found "..tostring(name)..": "..tostring(T_sides[i]),2)
@@ -202,10 +205,9 @@ function SettingsDialogue()
 	if string.sub(typeString, 1, 2) == "P_" then
 		--PERIPHERAL
 		print("Peripheral side (enter to skip):")
-		T_data.perSide = GetSideFromUser()
-		
 		if string.sub(typeString, 1, 4) == "P_LE" then
 			--Lasers
+			T_data.perSide = GetSideFromUser("laser")
 			T_data.laserFreq = LASER_FREQ
 			if string.sub(typeString, 1, 5) == "P_LEC" then
 				--with camera
@@ -226,6 +228,8 @@ function SettingsDialogue()
 					T_data.networkTimerChannel = nil
 				end
 			end
+		else
+			T_data.perSide = GetSideFromUser()
 		end
 	else
 		--NOT PERIPHERAL
