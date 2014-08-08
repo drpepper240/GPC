@@ -962,9 +962,7 @@ function DrawWidgetLaserEm(guiDataId)
 		canFire, r, t, p = PrepareLaser(controllerId, tx, ty, tz)
 	end
 
-	if canFire then
-		widgetText = string.format("  %d;%d;%d", math.floor(r), math.floor(t), math.floor(p))
-	end		
+	widgetText = string.format("  %d;%d;%d", math.floor(r), math.floor(t), math.floor(p))
 	
 	--first (blank) symbol is laser state
 	--second (blank) symbol is ability to fire
