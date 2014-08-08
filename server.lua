@@ -943,13 +943,19 @@ function DrawWidgetLaserEm(guiDataId)
 	
 	--target from the table
 	local tx, ty, tz = nil, nil, nil
-	local selected = T_guiTempData[widget.tTGuiId].selected
+	local selected = nil
+	if T_guiTempData[widget.tTGuiId] ~= nil then
+		selected = T_guiTempData[widget.tTGuiId]
+	end
+	
+	local canFire, r, t, p = false, nil, nil, nil 
+	
 	if selected ~= nil and T_guiTempData[widget.tTGuiId].targetList~= nil and T_guiTempData[widget.tTGuiId].targetList[selected]~= nil then
 		tx = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].x)
 		ty = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].y)
 		tz = tonumber(T_guiTempData[widget.tTGuiId].targetList[selected].z)
+		canFire, r, t, p = PrepareLaser(controllerId, tx, ty, tz)
 	end
-	local canFire, r, t, p = PrepareLaser(controllerId, tx, ty, tz)
 
 	if canFire then
 		widgetText = string.format("  %d;%d;%d", math.floor(r), math.floor(t), math.floor(p))
