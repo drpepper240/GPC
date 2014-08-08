@@ -1066,10 +1066,10 @@ function DrawWidgetLaserCam(guiDataId)
 				if value ~= nil then
 					modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
 				end
-				T_laserTempData[key] = nil
 			end
 			
 			--clearing results
+			T_laserTempData = {}
 			T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ = nil, nil, nil
 			
 		end
@@ -1574,8 +1574,8 @@ function ClickWidgetEngageButton(guiDataId)
 		if value ~= nil then
 			modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
 		end
-		T_laserTempData[key] = nil
 	end
+	T_laserTempData = {}
 	os.queueEvent("redraw")
 	PrintDbg("ClickWidgetEngageButton(): done", 0)
 end
