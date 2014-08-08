@@ -416,7 +416,7 @@ function Download(url)
 end
 
 
-local function Get(url, fileName)
+function Get(url, fileName)
     -- Determine file to download
     local sPath = shell.resolve( fileName )
     if fs.exists( sPath ) then
