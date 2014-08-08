@@ -220,14 +220,13 @@ function GuiLoop()
 				if p1 == 2 then
 					shell.run("rm", "sdata")
 --					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
-					Get(sdata.settings.sdataUrl)
+					Get(sdata.settings.sdataUrl, "sdata")
 					os.reboot()
 				elseif p1 == 3 then
 					shell.run("rm", "sdata")
-					Get(sdata.settings.sdataUrl)
+					Get(sdata.settings.sdataUrl, "sdata")
 					shell.run("rm", "startup")
-					Get(sdata.settings.startupUrl)
-					shell.run("pastebin", "get "..sdata.settings.pastebin.." startup")
+					Get(sdata.settings.startupUrl, "startup")
 					os.reboot()
 				end
 			end
