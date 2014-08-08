@@ -12,7 +12,7 @@
 --ID shoud be 3 chars or longer
 --ID should not be equal to controller type
 
-VERSION_STRING = "0.77"
+VERSION_STRING = "0.79"
 
 --				SUPPORTED TYPES:
 T_perTypes = {[1] = "AIRLOCK", [2] = "P_LEM", [3] = "CONTROLLER", [4] = "P_LEC"}
@@ -33,7 +33,7 @@ T_data.settings = {}
 T_data.modemSide = nil
 T_data.channelSend = 210
 T_data.channelReceive = 211
-T_data.pastebin = "7unFnvQV"				--pastebin entry for self-update
+T_data.updateUrl = "https://raw.githubusercontent.com/drpepper240/GPC/testing/client.lua"				--url for self-update
 T_data.state = colors.green					--default state (states are depicted by colors)
 T_data.overridden = false					--override mode
 T_data.debugLvl = 2							--debug level
@@ -101,11 +101,48 @@ function ReadResume()
     return
 end
 
+
+function Download(url)
+    write( "Connecting... " )
+    local response = http.get( url )
+        
+    if response then
+        print( "Success." )
+        
+        local sResponse = response.readAll()
+        response.close()
+        return sResponse
+    else
+        printError( "Failed." )
+    end
+end
+
+
+function Get(url, fileName)
+    -- Determine file to download
+    local sPath = shell.resolve( fileName )
+    if fs.exists( sPath ) then
+        print( "File already exists" )
+        return
+    end
+    
+    -- GET the contents from github
+    local res = Download(url)
+    if res then        
+        local file = fs.open( sPath, "w" )
+        file.write( res )
+        file.close()
+        
+        print( "Downloaded as "..fileName )
+    end
+end
+
+
 function GetSideFromUser(peripheralName)
 	PrintDbg("entering GetSideFromUser()", 2)
 	--listing all available sides
 	for i=1, #T_sides do
-		write(tostring(i).." - "..tostring(T_sides[i]).."\n")
+		write(tostring(i).." "..tostring(T_sides[i]).."\n")
 	end
 	print("a - autodetect")
 	input = read()
@@ -456,7 +493,7 @@ while true do
 		if p1 == 22 then
 			--Update
 			shell.run("rm", "startup")
-			shell.run("pastebin", "get "..T_data.pastebin.." startup")
+			Get(T_data.updateUrl, "startup")
 			os.reboot()
 		elseif p1 == 20 and T_data.overridden == false then
 			--Toggle
@@ -540,7 +577,7 @@ while true do
 						SendReportPacket()
 					elseif packet.command == "UPDATE" then
 						shell.run("rm", "startup")
-						shell.run("pastebin", "get "..T_data.pastebin.." startup")
+						Get(T_data.updateUrl, "startup")
 						os.reboot()
 					end
 				end
