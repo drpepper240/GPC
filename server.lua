@@ -1547,7 +1547,7 @@ end
 
 function ClickWidgetEngageButton(guiDataId)
 	for key,value in pairs( T_laserTempData ) do
-			PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 2)
+			PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 1)
 			modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
 	end
 	os.queueEvent("redraw")
