@@ -317,9 +317,10 @@ function UpdateStateTimer()
 			PrintDbg("UpdateState(): peripheral not found", 1)
 			return
 		end
-		
+		PrintDbg("UpdateStateTimer() ok1", 2)
 		--hitX, hitY, hitZ, hitId, hitMeta, hitRes
 		local hx, hy, hz, hid, hmeta, hres = peripheral.call(T_data.perSide, "getFirstHit")
+		PrintDbg("entering UpdateStateTimer() ok2", 2)
 		PrintDbg("Hit:"..tostring(hx).." "..tostring(hy).." "..tostring(hz).." ", 2)
 		if hx ~= 0 and hy ~=0 and hz~=0 and hid ~=0 then
 			--we hit something
