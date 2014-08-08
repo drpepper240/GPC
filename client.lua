@@ -347,6 +347,7 @@ function UpdateStateTimer()
 			end
 		end
 	end
+	PrintDbg("exiting UpdateStateTimer()", 2)
 end
 
 
