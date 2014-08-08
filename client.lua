@@ -476,7 +476,7 @@ while true do
 			PrintDbg("Network timer message received", 2)
 			UpdateStateTimer()
 		else
-			PrintDbg("Modem message received", 2)
+			PrintDbg("Modem message received: "..tostring(packet.target).." "..tostring(packet.command), 2)
 			local packet = textutils.unserialize(p4)
 			if packet.target ~= nil or packet.command ~= nil then
 				if (packet.target == label or packet.target == "BROADCAST" or packet.target == T_data.controllerType) then
