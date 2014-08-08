@@ -559,7 +559,6 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 	end
 	
 	local bgColor = GetControllerStateColor(controllerId)
-	monitor.setBackgroundColor(bgColor)
 	
 	--emitter coordinates
 	if T_ctrlTempData[controllerId].pos[1] == nil or T_ctrlTempData[controllerId].pos[2] == nil or T_ctrlTempData[controllerId].pos[3] == nil then
@@ -631,6 +630,7 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 			}
 			
 			--packets for secondary lasers
+			PrintDbg("preparing secondaries for "..controllerId, 1)
 			local secondary = sdata.ctrlData[controllerId].secondary
 			for i=1, table.getn(secondary) do
 				--emitter coordinates
