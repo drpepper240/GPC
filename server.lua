@@ -7,7 +7,7 @@
 -- and you think this stuff is worth it, you can give me a beer in return
 
 --don't forget to update this string
-VERSION_STRING = "0.77"
+VERSION_STRING = "0.78"
 
 ---------------------------------------------------------------------------------------------------
 -------------------			README
@@ -464,10 +464,10 @@ function ProcessPeripheralReturnMessage(packetT)
 		if string.sub(packetT.controllerType, 1, 5) == "P_LEC" then
 			--laser+camera getFirstHit report
 			if T_ctrlTempData[tostring(packetT.sender)] ~= nil then
-				PrintDbg("Got hit", 1)
 				T_ctrlTempData[tostring(packetT.sender)].hitX = packetT.hitX
 				T_ctrlTempData[tostring(packetT.sender)].hitY = packetT.hitY
 				T_ctrlTempData[tostring(packetT.sender)].hitZ = packetT.hitZ
+				AutoFire(tostring(packetT.sender))
 			end
 		end
 		
@@ -642,6 +642,32 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 	end
 	
 	return canFire, r, t, p
+end
+
+
+function AutoFire(controllerId)
+	if guiMode == "MODE_AUTOFIRE" then
+		PrintDbg("entering AutoFire()", 1)
+		if 	T_ctrlTempData[controllerId].hitX ~= nil and T_ctrlTempData[controllerId].hitY ~= nil and T_ctrlTempData[controllerId].hitZ ~= nil then
+			for i=1, table.getn(sdata.ctrlData[controllerId].autofireCtrlIds) do
+				laserControllerId = sdata.ctrlData[controllerId].autofireCtrlIds[i]
+				PrepareLaser(laserControllerId, T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ)
+			end
+			
+			--fire
+			for key,value in pairs( T_laserTempData ) do
+				PrintDbg("AUTOFIRE: sending to "..tostring(key), 1)
+				if value ~= nil then
+					modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
+				end
+			end
+			
+			--clearing results
+			T_laserTempData = {}
+			T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ = nil, nil, nil
+			
+		end
+	end
 end
 
 
@@ -1054,30 +1080,6 @@ function DrawWidgetLaserCam(guiDataId)
 			T_guiXy[i] = {}
 		end
 		T_guiXy[i][yPosition] = guiDataId
-	end
-	
-	if guiMode == "MODE_AUTOFIRE" then
-		PrintDbg("DrawWidgetLaserCam(): entering autofire", 1)
-		if 	T_ctrlTempData[controllerId].hitX ~= nil and T_ctrlTempData[controllerId].hitY ~= nil and T_ctrlTempData[controllerId].hitZ ~= nil then
-			for i=1, table.getn(widget.autofireCtrlIds) do
-				laserControllerId = widget.autofireCtrlIds[i]
-				PrintDbg("DrawWidgetLaserCam() preparing "..tostring(laserControllerId), 1)
-				PrepareLaser(laserControllerId, T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ)
-			end
-			
-			--fire
-			for key,value in pairs( T_laserTempData ) do
-				PrintDbg("AUTOFIRE: sending to "..tostring(key), 1)
-				if value ~= nil then
-					modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
-				end
-			end
-			
-			--clearing results
-			T_laserTempData = {}
-			T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ = nil, nil, nil
-			
-		end
 	end
 end
 
