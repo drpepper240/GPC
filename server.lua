@@ -7,7 +7,7 @@
 -- and you think this stuff is worth it, you can give me a beer in return
 
 --don't forget to update this string
-VERSION_STRING = "0.75"
+VERSION_STRING = "0.79"
 
 ---------------------------------------------------------------------------------------------------
 -------------------			README
@@ -110,6 +110,7 @@ VERSION_STRING = "0.75"
 --MODE_OVERRIDE			--click on a widget sends an "override" message to all associated controllers instead of passing the click to processing function
 --MODE_GFOR				--show coordinates in global frame of reference where possible
 --MODE_LFOR				--show coordinates in local (ship-bound) frame of reference where possible
+--MODE_AUTOFIRE			--fire lasers when GetFirstHit message received
 
 
 -------------------			DEBUG LEVELS
@@ -195,9 +196,9 @@ function Init()
 	end
 	monitor.setTextScale(sdata.settings.textSize)
 	mSizeX, mSizeY = monitor.getSize()
-	PrintDbg("GPC server by drPepper", 0)
-	PrintDbg("Version "..VERSION_STRING, 0)
 	PrintDbg("Monitor size:"..tostring(mSizeX)..", "..tostring(mSizeY), 1)
+	print("GPC server by drPepper")
+	print("version "..VERSION_STRING)
 	monitor.write("GPC server by drPepper")
 	monitor.write("version "..VERSION_STRING)
 	
@@ -213,20 +214,21 @@ function GuiLoop()
 			ProcessClick(p2,p3)
 		elseif event == "key" then
 			if p1 == 22 then
---				print("press 1 to update only sdata, 2 to update everything")
---				sleep(0.3)
---				local event, p1, p2, p3, p4, p5  = os.pullEvent("key")
---				if p1 == 2 then
+				print("press 1 to update only sdata, 2 to update everything")
+				sleep(0.3)
+				local event, p1, p2, p3, p4, p5  = os.pullEvent("key")
+				if p1 == 2 then
 					shell.run("rm", "sdata")
-					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
-					os.reboot()
---				elseif p1 == 3 then
---					shell.run("rm", "sdata")
 --					shell.run("pastebin", "get "..sdata.settings.pastebinSData.." sdata")
---					shell.run("rm", "startup")
---					shell.run("pastebin", "get "..sdata.settings.pastebin.." startup")
---					os.reboot()
---				end
+					Get(sdata.settings.sdataUrl, "sdata")
+					os.reboot()
+				elseif p1 == 3 then
+					shell.run("rm", "sdata")
+					Get(sdata.settings.sdataUrl, "sdata")
+					shell.run("rm", "startup")
+					Get(sdata.settings.startupUrl, "startup")
+					os.reboot()
+				end
 			end
 		end
 		
@@ -256,12 +258,14 @@ function ReceiveLoop()
 	end
 end
 
---returns widget state color (orange is for missing widgets)
-function GetWidgetStateColor(guiDataId)
+--returns controller state color (orange is for missing widgets)
+function GetControllerStateColor(controllerId)
+	if controllerId == nil then
+		PrintDbg("GetControllerStateColor(): controllerId missing", 1)
+		return colors.orange
+	end
 	local curTime = os.time()
 	local missing = false
-	local widget = sdata.guiData[guiDataId]
-	local controllerId = widget.controllerIds[1]
 	
 	if T_ctrlTempData[controllerId] == nil then
 		T_ctrlTempData[controllerId] = {}
@@ -394,6 +398,43 @@ function CartesianToPolar(x, y, z)
 	return r, theta, phi
 end
 
+
+function Download(url)
+    write( "Connecting... " )
+    local response = http.get( url )
+        
+    if response then
+        print( "Success." )
+        
+        local sResponse = response.readAll()
+        response.close()
+        return sResponse
+    else
+        printError( "Failed." )
+    end
+end
+
+
+function Get(url, fileName)
+    -- Determine file to download
+    local sPath = shell.resolve( fileName )
+    if fs.exists( sPath ) then
+        print( "File already exists" )
+        return
+    end
+    
+    -- GET the contents from github
+    local res = Download(url)
+    if res then        
+        local file = fs.open( sPath, "w" )
+        file.write( res )
+        file.close()
+        
+        print( "Downloaded as "..fileName )
+    end
+end
+
+
 ---------------------------------------------------------------------------------------------------
 -------------------			NETWORK HI-LEVEL
 ---------------------------------------------------------------------------------------------------
@@ -464,6 +505,7 @@ function ProcessPeripheralReturnMessage(packetT)
 				T_ctrlTempData[tostring(packetT.sender)].hitX = packetT.hitX
 				T_ctrlTempData[tostring(packetT.sender)].hitY = packetT.hitY
 				T_ctrlTempData[tostring(packetT.sender)].hitZ = packetT.hitZ
+				AutoFire(tostring(packetT.sender))
 			end
 		end
 		
@@ -510,20 +552,26 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 	end
 	
 	if T_ctrlTempData[controllerId].pos == nil then
-		PrintDbg("PrepareLaser() 'pos' result missing", 1)
+		PrintDbg("PrepareLaser() 'pos' result missing", 2)
 		T_ctrlTempData[controllerId].pos = {}
 		SendPosRequest(controllerId)
 		return false, nil, nil, nil
 	end
 	
-	local bgColor = GetWidgetStateColor(guiDataId)
-	monitor.setBackgroundColor(bgColor)
+	local bgColor = GetControllerStateColor(controllerId)
 	
 	--emitter coordinates
 	if T_ctrlTempData[controllerId].pos[1] == nil or T_ctrlTempData[controllerId].pos[2] == nil or T_ctrlTempData[controllerId].pos[3] == nil then
-		PrintDbg("PrepareLaser() 'pos' result is nil", 1)
+		PrintDbg("PrepareLaser() 'pos' result is nil", 2)
 		SendPosRequest(controllerId)
 		return false, nil, nil, nil
+	end
+	
+	if T_laserTempData == nil then
+		T_laserTempData = {}
+		if T_laserTempData[controllerId] == nil then
+			T_laserTempData[controllerId] = {}
+		end
 	end
 	
 	local gx = tonumber(T_ctrlTempData[controllerId].pos[1])
@@ -532,7 +580,7 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 	
 	--target vector
 	local tx, ty, tz = nil, nil, nil
-	local selected = T_guiTempData[widget.tTGuiId].selected
+
 	if gtx ~= nil and gty ~= nil and gtz ~= nil then
 		tx = tonumber(gtx) - gx
 		ty = tonumber(gty) - gy
@@ -568,9 +616,6 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 		widgetText = string.format("%d;%d;%d", math.floor(r), math.floor(t), math.floor(p))		
 
 		if canFire and T_ctrlTempData[controllerId].state == colors.green then
-			if T_laserTempData == nil then
-				T_laserTempData = {}
-			end
 			
 			--create a packet to send when FIRE button is pressed
 			local packetT = 
@@ -585,6 +630,7 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 			}
 			
 			--packets for secondary lasers
+			PrintDbg("preparing secondaries for "..controllerId, 1)
 			local secondary = sdata.ctrlData[controllerId].secondary
 			for i=1, table.getn(secondary) do
 				--emitter coordinates
@@ -597,13 +643,13 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 				end
 
 				if T_ctrlTempData[secondary[i]].pos == nil then
-					PrintDbg("PrepareLaser() 'pos' result missing for "..tostring(secondary[i]), 1)
+					PrintDbg("PrepareLaser() 'pos' result missing for "..tostring(secondary[i]), 2)
 					T_ctrlTempData[secondary[i]].pos = {}
 					SendPosRequest(secondary[i])
 					skipEmitter = true
 				end
 				if T_ctrlTempData[secondary[i]].pos[1] == nil or T_ctrlTempData[secondary[i]].pos[2] == nil or T_ctrlTempData[secondary[i]].pos[3] == nil then
-					PrintDbg("PrepareLaser() 'pos' result is nil for "..tostring(secondary[i]), 1)
+					PrintDbg("PrepareLaser() 'pos' result is nil for "..tostring(secondary[i]), 2)
 					SendPosRequest(secondary[i])
 					skipEmitter = true
 				end
@@ -634,6 +680,32 @@ function PrepareLaser(controllerId, gtx, gty, gtz)
 	end
 	
 	return canFire, r, t, p
+end
+
+
+function AutoFire(controllerId)
+	if guiMode == "MODE_AUTOFIRE" then
+		PrintDbg("entering AutoFire()", 1)
+		if 	T_ctrlTempData[controllerId].hitX ~= nil and T_ctrlTempData[controllerId].hitY ~= nil and T_ctrlTempData[controllerId].hitZ ~= nil then
+			for i=1, table.getn(sdata.ctrlData[controllerId].autofireCtrlIds) do
+				laserControllerId = sdata.ctrlData[controllerId].autofireCtrlIds[i]
+				PrepareLaser(laserControllerId, T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ)
+			end
+			
+			--fire
+			for key,value in pairs( T_laserTempData ) do
+				PrintDbg("AUTOFIRE: sending to "..tostring(key), 1)
+				if value ~= nil then
+					modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
+				end
+			end
+			
+			--clearing results
+			T_laserTempData = {}
+			T_ctrlTempData[controllerId].hitX, T_ctrlTempData[controllerId].hitY, T_ctrlTempData[controllerId].hitZ = nil, nil, nil
+			
+		end
+	end
 end
 
 
@@ -691,7 +763,7 @@ end
 function DrawWidgetSwitch(guiDataId)
 	local widget = sdata.guiData[guiDataId]
 	if widget.draw.xPos == nil or widget.draw.yPos == nil then
-		PrintDbg("DrawWidgetSwitch() data missing", 2)
+		PrintDbg("DrawWidgetSwitch() data missing", 1)
 		return
 	end
 	local yPosition = tonumber(widget.draw.yPos)
@@ -707,11 +779,11 @@ function DrawWidgetSwitch(guiDataId)
 	
 	local controllerId = widget.controllerIds[1]
 	if controllerId == nil then
-		PrintDbg("DrawWidgetSwitch() controllerId missing", 2)
+		PrintDbg("DrawWidgetSwitch() controllerId missing", 1)
 		return
 	end
 
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 		
 	local maxX = mSizeX
@@ -745,7 +817,7 @@ end
 function DrawWidgetLabel(guiDataId)
 	local label = sdata.guiData[guiDataId]
 	if label.draw.yPos == nil or label.draw.xPos == nil then 
-		PrintDbg("DrawWidgetLabel() error", 2)
+		PrintDbg("DrawWidgetLabel() error", 1)
 		return
 	end
 	local yPosition = tonumber(label.draw.yPos)
@@ -782,7 +854,7 @@ end
 function DrawWidgetSensor(guiDataId)
 	local sensor = sdata.guiData[guiDataId]
 	if sensor.draw.xPos == nil or sensor.draw.yPos == nil then
-		PrintDbg("DrawWidgetSensor() data missing", 2)
+		PrintDbg("DrawWidgetSensor() data missing", 1)
 		return
 	end
 	local yPosition = tonumber(sensor.draw.yPos)
@@ -790,13 +862,13 @@ function DrawWidgetSensor(guiDataId)
 	monitor.setCursorPos(xPosition, yPosition)
 	monitor.setTextColor(sdata.settings.guiTextColor)
 	
-	local sensorId = sensor.controllerIds[1]
-	if sensorId == nil then
-		PrintDbg("DrawWidgetSensor() sensorId missing", 2)
+	local controllerId = sensor.controllerIds[1]
+	if controllerId == nil then
+		PrintDbg("DrawWidgetSensor() controllerId missing", 1)
 		return
 	end
 
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
 	local maxX = mSizeX
@@ -804,18 +876,18 @@ function DrawWidgetSensor(guiDataId)
 		maxX = xPosition + sensor.draw.len
 	end
 	
-	local sensorText = sensorId
+	local sensorText = controllerId
 	
-	if T_ctrlTempData[sensorId].state == colors.green then
+	if T_ctrlTempData[controllerId].state == colors.green then
 		sensorText = sensor.guiNameGreen
-	elseif T_ctrlTempData[sensorId].state == colors.red then
+	elseif T_ctrlTempData[controllerId].state == colors.red then
 		sensorText = sensor.guiNameRed
 	end
 	
 	if guiMode == "MODE_VERSION" then 
-		sensorText = T_ctrlTempData[sensorId].version
+		sensorText = T_ctrlTempData[controllerId].version
 	elseif guiMode == "MODE_OVERRIDE" then
-		sensorText = tostring(T_ctrlTempData[sensorId].override)
+		sensorText = tostring(T_ctrlTempData[controllerId].override)
 	end
 	
 	sensorText = tostring(sensorText)
@@ -840,20 +912,20 @@ end
 function DrawWidgetSensorBar(guiDataId)
 	local bar = sdata.guiData[guiDataId]
 	if bar.draw.xPos == nil or bar.draw.yPos == nil then
-		PrintDbg("DrawWidgetSensorBar() data missing", 2)
+		PrintDbg("DrawWidgetSensorBar() data missing", 1)
 		return
 	end
 	monitor.setCursorPos(bar.draw.xPos, bar.draw.yPos)
 	monitor.setTextColor(sdata.settings.guiTextColor)
 	
 	for index=1, #bar.controllerIds do
-		local sensorId = bar.controllerIds[index]
-		if sensorId == nil then
-			PrintDbg("DrawWidgetSensorBar() sensorId missing", 2)
+		local controllerId = bar.controllerIds[index]
+		if controllerId == nil then
+			PrintDbg("DrawWidgetSensorBar() controllerId missing", 1)
 			return
 		end
 
-		local bgColor = GetWidgetStateColor(guiDataId)
+		local bgColor = GetControllerStateColor(controllerId)
 		monitor.setBackgroundColor(bgColor)
 	
 		local len = 1
@@ -877,7 +949,7 @@ end
 function DrawWidgetGuiModeSwitch(guiDataId)
 	local widget = sdata.guiData[guiDataId]
 	if widget.draw.len == nil or widget.draw.yPos == nil or widget.guiName == nil then
-		PrintDbg("DrawWidgetGuiModeSwitch() data missing", 2)
+		PrintDbg("DrawWidgetGuiModeSwitch() data missing", 1)
 		return
 	end
 	xPosition = 1
@@ -913,7 +985,7 @@ end
 --displays data for primary emitters. Displays r, theta, phi if there is a selected target or its widget text if none is selected.
 --first symbol background displays state of the controller(red/green/orange), other symbols - the ability to emit beam in the direction of the target selected (red/green)
 function DrawWidgetLaserEm(guiDataId)
-	PrintDbg("Entering DrawWidgetLaserEm()", 1)
+	PrintDbg("Entering DrawWidgetLaserEm()", 2)
 	local widget = sdata.guiData[guiDataId]
 	if widget.draw.xPos == nil or widget.draw.yPos == nil or widget.rPGuiId == nil then
 		PrintDbg("DrawWidgetLaserEm() data missing", 1)
@@ -936,7 +1008,7 @@ function DrawWidgetLaserEm(guiDataId)
 	end
 	
 	if T_ctrlTempData[controllerId] == nil then
-		PrintDbg("PrepareLaser() T_ctrlTempData missing", 1)
+		PrintDbg("PrepareLaser() T_ctrlTempData missing", 2)
 		T_ctrlTempData[controllerId] = {}
 		T_ctrlTempData[controllerId].state = colors.orange
 		T_ctrlTempData[controllerId].lastResp = 0 
@@ -950,8 +1022,10 @@ function DrawWidgetLaserEm(guiDataId)
 	local tx, ty, tz = nil, nil, nil
 	local selected = nil
 	if T_guiTempData[widget.tTGuiId] ~= nil then
-		selected = T_guiTempData[widget.tTGuiId]
+		selected = T_guiTempData[widget.tTGuiId].selected --selected row
 	end
+	
+
 	
 	local canFire, r, t, p = false, nil, nil, nil 
 	
@@ -962,7 +1036,7 @@ function DrawWidgetLaserEm(guiDataId)
 		canFire, r, t, p = PrepareLaser(controllerId, tx, ty, tz)
 	end
 
-	if canFire then
+	if r ~= nil and t ~= nil and p ~= nil then
 		widgetText = string.format("  %d;%d;%d", math.floor(r), math.floor(t), math.floor(p))
 	end		
 	
@@ -972,13 +1046,14 @@ function DrawWidgetLaserEm(guiDataId)
 		local letterPos = i + 1 - xPosition
 		if letterPos == 1 then
 			monitor.setBackgroundColor(T_ctrlTempData[controllerId].state)
-		end
-		if letterPos == 2 then
+		elseif letterPos == 2 then
 			if canFire then
 				monitor.setBackgroundColor(colors.green)
 			else
 				monitor.setBackgroundColor(colors.red)
 			end
+		else 
+			monitor.setBackgroundColor(sdata.settings.guiBgColor)
 		end
 		if letterPos <= string.len(widgetText) then
 			monitor.write(string.sub(widgetText, letterPos, letterPos))
@@ -995,6 +1070,7 @@ end
 
 --displays coordinates, last received from the laser camera (using getFirstHit)
 function DrawWidgetLaserCam(guiDataId)
+	PrintDbg("Entering DrawWidgetLaserCam()", 1)
 	local widget = sdata.guiData[guiDataId]
 	if widget.draw.xPos == nil or widget.draw.yPos == nil or widget.draw.len == nil then
 		PrintDbg("DrawWidgetLaserCam() data missing", 1)
@@ -1014,21 +1090,22 @@ function DrawWidgetLaserCam(guiDataId)
 	end
 	
 	if T_ctrlTempData[controllerId] == nil then
-		PrintDbg("DrawWidgetLaserCam() T_ctrlTempData missing", 1)
+		PrintDbg("DrawWidgetLaserCam() T_ctrlTempData missing", 2)
 		T_ctrlTempData[controllerId] = {}
 		T_ctrlTempData[controllerId].state = colors.orange
 		T_ctrlTempData[controllerId].lastResp = 0 
 		return
 	end
 	
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
+	widgetText = tostring(T_ctrlTempData[controllerId].hitX)..";"..tostring(T_ctrlTempData[controllerId].hitY)..";"..tostring(T_ctrlTempData[controllerId].hitZ)..";"
+
 	if guiMode == "MODE_VERSION" then
 		widgetText = tostring(T_ctrlTempData[controllerId].version)
 	end
-	
-	widgetText = tostring(T_ctrlTempData[controllerId].hitX)..";"..tostring(T_ctrlTempData[controllerId].hitY)..";"..tostring(T_ctrlTempData[controllerId].hitZ)..";"
+
 	for i = xPosition, xPosition + widget.draw.len do
 		local letterPos = i + 1 - xPosition
 		if letterPos <= string.len(widgetText) then
@@ -1048,7 +1125,7 @@ end
 function DrawWidgetTargetTable(guiDataId) 
 	local widget = sdata.guiData[guiDataId]
 	if widget.draw.xPos == nil or widget.draw.yPos == nil then
-		PrintDbg("DrawWidgetLaserTargetTable() data missing", 2)
+		PrintDbg("DrawWidgetLaserTargetTable() data missing", 1)
 		return
 	end
 	
@@ -1161,15 +1238,15 @@ function DrawWidgetReferencePoint(guiDataId)
 	
 	local lx, ly, lz = sdata.ctrlData[controllerId].lx, sdata.ctrlData[controllerId].ly, sdata.ctrlData[controllerId].lz
 	if lx == nil or ly == nil or lz == nil then
-		PrintDbg("DrawWidgetReferencePoint() local coordinate data missing", 1)
+		PrintDbg("DrawWidgetReferencePoint() local coordinate data missing", 2)
 		return
 	end
 
-	local bgColor = GetWidgetStateColor(guiDataId)
+	local bgColor = GetControllerStateColor(controllerId)
 	monitor.setBackgroundColor(bgColor)
 	
 	if T_ctrlTempData[controllerId].pos == nil then
-		PrintDbg("DrawWidgetReferencePoint() 'pos' result missing", 1)
+		PrintDbg("DrawWidgetReferencePoint() 'pos' result missing", 2)
 		T_ctrlTempData[controllerId].pos = {}
 		SendPosRequest(controllerId)
 	end
@@ -1177,7 +1254,7 @@ function DrawWidgetReferencePoint(guiDataId)
 	local widgetText = ""
 	
 	if T_ctrlTempData[controllerId].pos[1] == nil or T_ctrlTempData[controllerId].pos[2] == nil or T_ctrlTempData[controllerId].pos[3] == nil then
-		PrintDbg("DrawWidgetReferencePoint() 'pos' result is nil", 1)
+		PrintDbg("DrawWidgetReferencePoint() 'pos' result is nil", 2)
 		SendPosRequest(controllerId)
 		return
 	end
@@ -1232,7 +1309,7 @@ end
 function DrawWidgetEngageButton(guiDataId)
 	local widget = sdata.guiData[guiDataId]
 	if widget.draw.len == nil or widget.draw.yPos == nil or widget.guiName == nil then
-		PrintDbg("DrawWidgetEngageButton() data missing", 2)
+		PrintDbg("DrawWidgetEngageButton() data missing", 1)
 		return
 	end
 	xPosition = 1
@@ -1537,16 +1614,14 @@ function ClickWidgetReferencePoint(guiDataId)
 end
 
 function ClickWidgetEngageButton(guiDataId)
-	if T_guiTempData[guiDataId] ~= nil and modem ~= nil then
-		for key,value in pairs( T_laserTempData ) do
-			PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 2)
+	for key,value in pairs( T_laserTempData ) do
+		PrintDbg("ClickWidgetEngageButton(): sending to "..tostring(key), 1)
+		if value ~= nil then
 			modem.transmit(sdata.settings.channelSend, sdata.settings.channelReceive, value)
 		end
-		T_laserTempData = nil
-		os.queueEvent("redraw")
-	elseif T_laserTempData == nil then
-		PrintDbg("ClickWidgetEngageButton(): T_laserTempData is null", 0)
 	end
+	T_laserTempData = {}
+	os.queueEvent("redraw")
 	PrintDbg("ClickWidgetEngageButton(): done", 0)
 end
 

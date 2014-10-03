@@ -12,7 +12,7 @@
 --ID shoud be 3 chars or longer
 --ID should not be equal to controller type
 
-VERSION_STRING = "0.75"
+VERSION_STRING = "0.791"
 
 --				SUPPORTED TYPES:
 T_perTypes = {[1] = "AIRLOCK", [2] = "P_LEM", [3] = "CONTROLLER", [4] = "P_LEC"}
@@ -33,7 +33,7 @@ T_data.settings = {}
 T_data.modemSide = nil
 T_data.channelSend = 210
 T_data.channelReceive = 211
-T_data.pastebin = "7unFnvQV"				--pastebin entry for self-update
+T_data.updateUrl = "https://raw.githubusercontent.com/drpepper240/GPC/testing/client.lua"				--url for self-update
 T_data.state = colors.green					--default state (states are depicted by colors)
 T_data.overridden = false					--override mode
 T_data.debugLvl = 1							--debug level
@@ -101,16 +101,56 @@ function ReadResume()
     return
 end
 
+
+function Download(url)
+    write( "Connecting... " )
+    local response = http.get( url )
+        
+    if response then
+        print( "Success." )
+        
+        local sResponse = response.readAll()
+        response.close()
+        return sResponse
+    else
+        printError( "Failed." )
+    end
+end
+
+
+function Get(url, fileName)
+    -- Determine file to download
+    local sPath = shell.resolve( fileName )
+    if fs.exists( sPath ) then
+        print( "File already exists" )
+        return
+    end
+    
+    -- GET the contents from github
+    local res = Download(url)
+    if res then        
+        local file = fs.open( sPath, "w" )
+        file.write( res )
+        file.close()
+        
+        print( "Downloaded as "..fileName )
+    end
+end
+
+
 function GetSideFromUser(peripheralName)
 	PrintDbg("entering GetSideFromUser()", 2)
 	--listing all available sides
 	for i=1, #T_sides do
-		write(tostring(i).." - "..tostring(T_sides[i]).."\n")
+		write(tostring(i).." "..tostring(T_sides[i]).."\n")
 	end
-	input = read()
-	if tostring(input) == "a" and peripheralName ~= nil then
-		--autodetect
-		input = DetectPeripheral(peripheralName)
+	if peripheralName ~= nil then
+		print("a - autodetect "..peripheralName)
+		input = read()
+		if tostring(input) == "a" then
+			--autodetect
+			input = DetectPeripheral(peripheralName)
+		end
 	end
 	if tonumber(input) == nil then
 		return nil
@@ -123,7 +163,8 @@ end
 function DetectPeripheral(name)  
 	for i = 1, 6 do
 		if peripheral.isPresent(T_sides[i]) and peripheral.getType(T_sides[i]) == name then
-			print("found "..tostring(name)..": "..tostring(T_sides[i]))
+			print("Found "..tostring(name)..": "..tostring(T_sides[i]))
+			print()
 			return i
 		else
 			PrintDbg("not found "..tostring(name)..": "..tostring(T_sides[i]),2)
@@ -164,10 +205,9 @@ function SettingsDialogue()
 	if string.sub(typeString, 1, 2) == "P_" then
 		--PERIPHERAL
 		print("Peripheral side (enter to skip):")
-		T_data.perSide = GetSideFromUser()
-		
 		if string.sub(typeString, 1, 4) == "P_LE" then
 			--Lasers
+			T_data.perSide = GetSideFromUser("laser")
 			T_data.laserFreq = LASER_FREQ
 			if string.sub(typeString, 1, 5) == "P_LEC" then
 				--with camera
@@ -188,6 +228,8 @@ function SettingsDialogue()
 					T_data.networkTimerChannel = nil
 				end
 			end
+		else
+			T_data.perSide = GetSideFromUser()
 		end
 	else
 		--NOT PERIPHERAL
@@ -316,9 +358,10 @@ function UpdateStateTimer()
 			PrintDbg("UpdateState(): peripheral not found", 1)
 			return
 		end
-		
+		PrintDbg("UpdateStateTimer() ok1", 2)
 		--hitX, hitY, hitZ, hitId, hitMeta, hitRes
 		local hx, hy, hz, hid, hmeta, hres = peripheral.call(T_data.perSide, "getFirstHit")
+		PrintDbg("entering UpdateStateTimer() ok2", 2)
 		PrintDbg("Hit:"..tostring(hx).." "..tostring(hy).." "..tostring(hz).." ", 2)
 		if hx ~= 0 and hy ~=0 and hz~=0 and hid ~=0 then
 			--we hit something
@@ -346,6 +389,7 @@ function UpdateStateTimer()
 			end
 		end
 	end
+	PrintDbg("exiting UpdateStateTimer()", 2)
 end
 
 
@@ -388,6 +432,8 @@ label = os.getComputerLabel()
 if (label == 0) then
 	PrintDbg("Assign this controller a unique label", 0)
 	return
+else
+	print("ID: "..tostring(label))
 end
 
 ReadResume()
@@ -451,7 +497,7 @@ while true do
 		if p1 == 22 then
 			--Update
 			shell.run("rm", "startup")
-			shell.run("pastebin", "get "..T_data.pastebin.." startup")
+			Get(T_data.updateUrl, "startup")
 			os.reboot()
 		elseif p1 == 20 and T_data.overridden == false then
 			--Toggle
@@ -471,8 +517,8 @@ while true do
 			PrintDbg("Network timer message received", 2)
 			UpdateStateTimer()
 		else
-			PrintDbg("Modem message received", 2)
 			local packet = textutils.unserialize(p4)
+			PrintDbg("Modem message received: "..tostring(packet.target).." "..tostring(packet.command).." "..tostring(packet.pCommand), 2)
 			if packet.target ~= nil or packet.command ~= nil then
 				if (packet.target == label or packet.target == "BROADCAST" or packet.target == T_data.controllerType) then
 					if packet.command == "SET STATE" then
@@ -535,7 +581,7 @@ while true do
 						SendReportPacket()
 					elseif packet.command == "UPDATE" then
 						shell.run("rm", "startup")
-						shell.run("pastebin", "get "..T_data.pastebin.." startup")
+						Get(T_data.updateUrl, "startup")
 						os.reboot()
 					end
 				end
